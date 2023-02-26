@@ -33,7 +33,7 @@ def infer(model_path, noisy, clean=None):
 
 
 if __name__ == '__main__':
-    mpath = 'models/lightning_logs/version_11/checkpoints/epoch=14-step=885.ckpt'
+    mpath = 'models/lightning_logs/version_14/checkpoints/epoch=14-step=885.ckpt'
     noisy = 'noisy/01_noisy_138.png'
     clean = 'clean/01_clean_138.png'
     clean_im, clean_h = infer(mpath, noisy, clean=clean)
