@@ -1,8 +1,10 @@
-import cv2
-import os
-import numpy as np
 import re
 import argparse
+import glob
+import numpy as np
+import cv2
+import tqdm
+
 
 
 
@@ -17,23 +19,25 @@ def natural_keys(text):
     '''
     return [ atoi(c) for c in re.split(r'(\d+)', text) ]
 
-def chunk_im(impaths, h=200, w=200):
+def chunk_im(impaths, dest='chunked', h=200, w=200):
     # ims is list of images
-    count = 0
-    for p in impaths:
+    # TODO: make sure iso200 images were chunked first
+    for p in tqdm.tqdm(impaths):
+        count = 0
         im = cv2.imread(p)
         tag = p.split('/')[-1].split('.')[0]
-        base = 'noisy' if 'noisy' in tag else 'clean'
         x, y = im.shape[:2]
         for i in range(0, x, h):
             for j in range(0, y, w):
                 sub = im[i:i+h, j:j+w, :]
-                if sub.shape != (h, w, 3):
-                    sh, sw = sub.shape[:2]
-                    sub = np.pad(sub, ((0, h-sh), (0, w-sw), (0, 0)), 'constant', constant_values=0)
-                assert sub.shape == (h, w, 3)
-                cv2.imwrite(f'{base}/{tag}_{count}.png', sub)
-                count += 1
+                if sub.shape == (h, w, 3):
+                    # don't pad
+
+                    # sh, sw = sub.shape[:2]
+                    # sub = np.pad(sub, ((0, h-sh), (0, w-sw), (0, 0)), 'constant', constant_values=0)
+                    # assert sub.shape == (h, w, 3)
+                    cv2.imwrite(f'{dest}/{tag}_{count}.png', sub)
+                    count += 1
 
 def join_im(over_shape, chunks):
     # over_shape is (h, w)
@@ -48,10 +52,8 @@ def join_im(over_shape, chunks):
 
 
 if __name__ == '__main__':
-    # parser = argparse.ArgumentParser()
-    # parser.add_argument('-p', default=all)
-    # args = parser.parse_args()
-    clean = [os.path.join('data/clean', i) for i in os.listdir('data/clean')]
-    noisy = [os.path.join('data/noisy', i) for i in os.listdir('data/noisy')]
-    chunk_im(clean)
-    chunk_im(noisy)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-s', help="size of chunked images", default=500)
+    args = parser.parse_args()
+    paths = glob.glob('NIND/*/*', recursive=True)
+    chunk_im(paths[:len(paths)//5], h=args.s, w=args.s)
