@@ -1,8 +1,10 @@
 import glob
 import os
 import torch
+from torchvision import transforms as tf
 import pytorch_lightning as pl
 import pandas as pd
+from PIL import Image
 import cv2
 from sklearn.model_selection import train_test_split
 
@@ -24,6 +26,16 @@ def gather_NIND(source='chunked'):
 class ReconDataset(torch.utils.data.Dataset):
     def __init__(self, df) -> None:
         super().__init__()
+        self.ntf =  tf.Compose([
+            tf.ToTensor(),
+            tf.CenterCrop((256, 256))
+            # tf.Normalize([79.85463183,  93.36660204, 110.08516866], [58.40277937, 59.24062922, 60.78025515])
+        ])
+        self.ctf = tf.Compose([
+            tf.ToTensor(),
+            tf.CenterCrop((256, 256))
+            # tf.Normalize([81.10789587,  94.85670306, 111.62399867], [54.92694471, 57.5654794 , 58.92771677])
+        ])
         self.df = df
 
     def __len__(self):
@@ -32,24 +44,27 @@ class ReconDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         # f = tf.Compose([
         #     tf.ToTensor(),
-        #     tf.Resize((420, 540)), 
-        #     tf.Grayscale(1)
+        #     # tf.Resize((256, 256))
         # ])
         x, y = self.df.iloc[idx]
-        cim = cv2.imread(x)/255.
-        nim = cv2.imread(y)/255.
-        # cim = f(cim.astype(np.float32))
-        # nim = f(nim.astype(np.float32))
-        return torch.FloatTensor(nim).permute(2, 0, 1), torch.FloatTensor(cim).permute(2, 0, 1)
-        # return nim, cim
+        assert x.split('_')[-1] == y.split('_')[-1], 'Mismatch of chunks'
+        assert y.split('_')[-2] == 'ISO200', 'Clean is incorrect'
+        assert ''.join(x.split('_')[:-2]) == ''.join(y.split('_')[:-2]), 'Mismatch of item'
+        nim = Image.open(x)
+        cim = Image.open(y)
+        # nim = cv2.imread(x)
+        # cim = cv2.imread(y)
+        # nim, cim = torch.FloatTensor(nim).permute(2, 0, 1), torch.FloatTensor(cim).permute(2, 0, 1)
+        # print(nim.max(), nim.min(), cim.max(), cim.min())
+        nim, cim = self.ntf(nim), self.ctf(cim)
+        return nim, cim
+
     
 class ReconDataModule(pl.LightningDataModule):
     def __init__(self, df, batch_size, check=False) -> None:
         super().__init__()
         self.train, self.test = train_test_split(df, test_size=0.2,
-                                                 random_state=42,
-                                                 shuffle=True)
-        
+                                                 random_state=42)        
         self.batch_size = batch_size
         if check:
             self.checks()
