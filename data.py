@@ -28,12 +28,12 @@ class ReconDataset(torch.utils.data.Dataset):
         super().__init__()
         self.ntf =  tf.Compose([
             tf.ToTensor(),
-            tf.CenterCrop((256, 256))
+            tf.CenterCrop((400, 400))
             # tf.Normalize([79.85463183,  93.36660204, 110.08516866], [58.40277937, 59.24062922, 60.78025515])
         ])
         self.ctf = tf.Compose([
             tf.ToTensor(),
-            tf.CenterCrop((256, 256))
+            tf.CenterCrop((400, 400))
             # tf.Normalize([81.10789587,  94.85670306, 111.62399867], [54.92694471, 57.5654794 , 58.92771677])
         ])
         self.df = df

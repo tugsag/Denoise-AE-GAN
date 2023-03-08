@@ -57,42 +57,27 @@ class LinL(nn.Module):
 class GeneratorConv(nn.Module):
     def __init__(self, channels, **kws) -> None:
         super().__init__()
-        self.c1 = ConvL(channels, 32, 9, pad=4, batch_norm=True)
+        self.c1 = ConvL(channels, 32, 7)
         self.c2 = ConvL(32, 64, 3, batch_norm=True)
         self.c3 = ConvL(64, 64, 3, batch_norm=True)
-        self.c4 = ConvL(64, 128, 3, batch_norm=True)
-        self.r1 = Residual(128, 128, 3)
-        self.r2 = Residual(128, 128, 3)
-        self.r3 = Residual(128, 128, 3)
-        self.dc1 = DeconvL(128, 64, 3)
-        self.dc2 = DeconvL(64, 64, 3)
-        self.dc3 = DeconvL(64, 32, 3)
-        self.dc4 = DeconvL(32, 32, 9)
-        self.fc = ConvL(32, 3, 9, batch_norm=True)
-        self.out = nn.Tanh()
-        # self.seq = nn.Sequential(
-        #     self.c1, self.c2, self.c3, self.c4, 
-        #     self.dc1, self.dc2, self.dc3, self.dc4, nn.Sigmoid()
-        # )
+        self.r1 = Residual(64, 64, 3)
+        self.r2 = Residual(64, 64, 3)
+        self.r3 = Residual(64, 64, 3)
+        self.dc1 = DeconvL(64, 64, 3)
+        self.dc2 = DeconvL(64, 32, 5)
+        self.dc3 = DeconvL(32, 32, 7)
+        self.fc1 = ConvL(32, 3, 3, batch_norm=True)
+        self.out = nn.Sigmoid()
+
+        self.seq = nn.Sequential(
+            self.c1, self.c2, self.c3,
+            self.r1, self.r2, self.r3,
+            self.dc1, self.dc2, self.dc3,
+            self.fc1, self.out
+        )
 
     def forward(self, x):
-        c1 = self.c1(x)
-        y = self.c2(c1)
-        y = self.c3(y)
-        y = self.c4(y)
-
-        r = self.r1(y)
-        r = self.r2(r)
-        r = self.r3(r)
-
-        dc = self.dc1(r)
-        dc = self.dc2(dc)
-        dc3 = self.dc3(dc) + c1
-        dc = self.dc4(dc3)
-
-        fc = self.fc(dc)
-        f = fc + x
-        return self.out(f)
+        return self.seq(x)
         
 class GeneratorLin(nn.Module):
     def __init__(self, im_shape, latent_dim=100) -> None:
@@ -117,13 +102,15 @@ class Discrim(nn.Module):
         self.c1 = ConvL(channels, 32, 4, stride=2)
         self.c2 = ConvL(32, 64, 4, stride=2)
         self.c3 = ConvL(64, 64, 4, stride=2)
+        self.r1 = Residual(64, 64, 3)
+        self.r2 = Residual(64, 64, 3)
         self.c4 = ConvL(64, 128, 4)
         self.c5 = ConvL(128, 32, 4)
-        self.linout = nn.Linear(32*54*54, 1)
+        self.linout = nn.Linear(32*42*42, 1)
         self.out = nn.Sigmoid()
         # left manual declarations for easier debugging
         self.seq = nn.Sequential(
-            self.c1, self.c2, self.c3, self.c4, self.c5
+            self.c1, self.c2, self.c3, self.r1, self.r2, self.c4, self.c5
         )
 
     def forward(self, x):

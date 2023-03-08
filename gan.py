@@ -15,13 +15,13 @@ from models import GeneratorConv, Discrim
 
 dev = 'cuda'
 class GANDenoise(pl.LightningModule):
-    def __init__(self, generator: torch.nn.Module, discriminator: torch.nn.Module, content_: torch.nn.Module = None) -> None:
+    def __init__(self, generator: torch.nn.Module, discriminator: torch.nn.Module) -> None:
         super().__init__()
         self.gen = generator
         self.dis = discriminator
-        self.content_ = content_
         self.tv = TV()
         self.dis_loss = torch.nn.BCELoss()
+        self.con_loss = torch.nn.L1Loss()
 
     def forward(self, x):
         return self.gen(x)
@@ -29,16 +29,17 @@ class GANDenoise(pl.LightningModule):
     def training_step(self, batch, batch_idx, optimizer_idx):
         x, y = batch
 
-        # generate images
+        # generate image and discriminate
         generated_imgs = self.forward(x)
         disg_outs = self.dis(generated_imgs)
 
         # train gen
         if optimizer_idx == 0:
             # log sampled images
-            sample_imgs = generated_imgs[:6]
-            grid = torchvision.utils.make_grid(sample_imgs)
-            self.logger.experiment.add_image("generated_images", grid, 0)
+            if (batch_idx + 1) % 30 == 0:
+                sample_imgs = torch.cat([generated_imgs[:3], y[:3]])
+                grid = torchvision.utils.make_grid(sample_imgs)
+                self.logger.experiment.add_image("generated_images", grid, self.current_epoch)
 
             # ground truth result (ie: all fake)
             # put on GPU because we created this tensor inside training_loop
@@ -70,28 +71,9 @@ class GANDenoise(pl.LightningModule):
         return (self.dis_loss(disg_out, fake) + self.dis_loss(disr_out, valid)) / 2
         # return -torch.mean(torch.log(disr_out) + torch.log(1-disg_out))
     
-    def get_feature_loss(self, real_im, gen_out):
-        ftt = self.content_(real_im)
-        gtt = self.content_(gen_out)
-        feature_count = ftt.shape[1]
-        floss = torch.nn.functional.mse_loss(ftt, gtt) / feature_count
-        return floss
-    
-    def get_smooth_loss(self, gen_out):
-        # b, h, w = gen_out.shape[0], gen_out.shape[2], gen_out.shape[3]
-        # hn = gen_out[:b, :, :h, :w-1]
-        # hr = gen_out[:b, :, :h, 1:w-1]
-        # vn = gen_out[:b, :, :h-1, :w]
-        # vr = gen_out[:b, :, 1:h-1, :w]
-        # return torch.nn.functional.mse_loss(hn, hr) + torch.nn.functional.mse_loss(vn, vr)
-        return self.tv(gen_out)
-
     def calculate_g_loss(self, gen_out, disg_loss, real_im):
-        pixel_loss = torch.nn.functional.mse_loss(gen_out, real_im)
-        smooth_loss = self.get_smooth_loss(gen_out)
-        feature_loss = self.get_feature_loss(real_im, gen_out)
-        gloss = 0.5 * disg_loss + pixel_loss + 0.0001*smooth_loss + feature_loss
-        return gloss
+        content = self.con_loss(gen_out, real_im)
+        return 0.9 * content + 0.1 * disg_loss
         
     def configure_optimizers(self):
         opt_g = torch.optim.Adam(self.gen.parameters())
@@ -119,11 +101,10 @@ if __name__ == '__main__':
     datamodule = ReconDataModule(df, args.b)
     gen = GeneratorConv(3, latent_dim=100).to(dev)
     dis = Discrim(args.c).to(dev)
-    vgg = torchvision.models.vgg16(pretrained=True)
-    vgg_cont = torch.nn.Sequential(*list(vgg.children())[:-2])
+
     trainer = pl.Trainer(max_epochs=args.e, 
                          accelerator='gpu', devices=1, 
                          default_root_dir='models/',
                          logger=tb)
-    trainer.fit(GANDenoise(gen, dis, vgg_cont), datamodule=datamodule)
+    trainer.fit(GANDenoise(gen, dis), datamodule=datamodule)
 

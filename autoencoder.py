@@ -6,9 +6,8 @@ from pytorch_lightning import loggers as pl_loggers
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
-from piqa.ssim import SSIM
+from piqa.ssim import SSIM, MS_SSIM
 from piqa.tv import TV
-from piqa.haarpsi import HaarPSI
 
 from models import ConvAE, LinAE, ConvLinAE
 from data import ReconDataModule, gather_NIND
@@ -21,7 +20,7 @@ class AEDenoise(pl.LightningModule):
         super().__init__()
         self.model = model
         self.tv = TV()
-        self.cri = SSIM()
+        self.cri = MS_SSIM()
         self.inv = True
         self.multi_part = multi_part
 
@@ -48,7 +47,7 @@ class AEDenoise(pl.LightningModule):
             #             idx)
             tb.add_figure('ims', 
                         plot_samples(y_h, y, x), 
-                        idx)
+                        self.current_epoch)
         return loss 
     
     def validation_step(self, batch, idx):

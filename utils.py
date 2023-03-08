@@ -40,8 +40,7 @@ def plot_samples(out, target, original):
     out = out[0].cpu().permute(1, 2, 0).detach().numpy()
     target = target[0].cpu().permute(1, 2, 0).numpy()
     original = original[0].cpu().permute(1, 2, 0).detach().numpy()
-    target = cv2.cvtColor(target, cv2.COLOR_BGR2RGB)
-    original = cv2.cvtColor(original, cv2.COLOR_BGR2RGB)
+
     ax[0].imshow(out)
     ax[0].set_title('model')
     ax[1].imshow(np.clip(target, 0., 1.))
